@@ -5,10 +5,11 @@
 #include <ros2arduino.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
+#include <string.h>
 
 //if QUEUE_SIZE > 2, you can not use xQueueOverwrite()!!!
 //also use xQueueSend()
-#define QUEUE_SIZE 1
+#define QUEUE_SIZE 100
 
 template<typename MsgTx, typename MsgRx>
 class ROS2WR : public ros2::Node{
@@ -19,15 +20,17 @@ private:
   static void subsclibed(MsgRx* msg, void *arg){
     (void)(arg);
     static ROS2WR<MsgTx, MsgRx> *_this = ROS2WR<MsgTx, MsgRx>::thisPtr;
-    xQueueOverwriteFromISR(_this->command_q, msg, NULL);
+    static MsgRx qmsg;
+    memcpy(&qmsg, msg, sizeof((*msg)));
+    xQueueSend(_this->command_q, &qmsg, 0);
   }
 
   static void publishing(MsgTx* msg, void *arg){
     (void)(arg);
     static ROS2WR<MsgTx, MsgRx> *_this = ROS2WR<MsgTx, MsgRx>::thisPtr;
-    static MsgTx *qmsg;
-    if(xQueueReceiveFromISR(_this->status_q, qmsg, NULL) == pdTRUE){
-        msg = qmsg;
+    static MsgTx qmsg;
+    if(xQueueReceive(_this->status_q, &qmsg, 0) == pdTRUE){
+      memcpy(msg, &qmsg, sizeof(qmsg));
     }
   }
 
@@ -44,7 +47,7 @@ public:
   }
 
   void setPublishMsg(MsgTx *msg){
-      xQueueSend(this->status_q, (*msg), 0);
+      xQueueSend(this->status_q, msg, 0);
   }
 
   MsgRx getSubscribeMsg(){
