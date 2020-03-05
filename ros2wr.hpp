@@ -9,7 +9,7 @@
 
 //if QUEUE_SIZE > 2, you can not use xQueueOverwrite()!!!
 //also use xQueueSend()
-#define QUEUE_SIZE 100
+#define QUEUE_SIZE 10
 
 template<typename MsgTx, typename MsgRx>
 class ROS2WR : public ros2::Node{
@@ -20,15 +20,13 @@ private:
   static void subsclibed(MsgRx* msg, void *arg){
     (void)(arg);
     static ROS2WR<MsgTx, MsgRx> *_this = ROS2WR<MsgTx, MsgRx>::thisPtr;
-    static MsgRx qmsg;
-    memcpy(&qmsg, msg, sizeof((*msg)));
-    xQueueSend(_this->command_q, &qmsg, 0);
+    xQueueSend(_this->command_q, msg, 0);
   }
 
   static void publishing(MsgTx* msg, void *arg){
     (void)(arg);
     static ROS2WR<MsgTx, MsgRx> *_this = ROS2WR<MsgTx, MsgRx>::thisPtr;
-    static MsgTx qmsg;
+    MsgTx qmsg;
     if(xQueueReceive(_this->status_q, &qmsg, 0) == pdTRUE){
       memcpy(msg, &qmsg, sizeof(qmsg));
     }
@@ -50,10 +48,9 @@ public:
       xQueueSend(this->status_q, msg, 0);
   }
 
-  MsgRx getSubscribeMsg(){
-      static MsgRx *buff;
-      xQueueReceive(this->command_q, buff, 0);
-      return (*buff);
+  bool getSubscribeMsg(MsgRx *msg){
+      if (xQueueReceive(this->command_q, msg, 0) == pdTRUE) return true;
+      else return false;
   }
 };
 
